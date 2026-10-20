@@ -6,6 +6,8 @@ el resultado queda al lado del original. Inspirado en Tangerine (macOS). Todo co
 
 ## Instalar (1 clic)
 
+**[⬇ Descargar Mandarina.exe](https://github.com/lucasclemente08/Mandarina/releases/latest/download/Mandarina.exe)** (Windows 10/11, x64; requiere el [.NET 9 Desktop Runtime](https://dotnet.microsoft.com/download/dotnet/9.0) y [ffmpeg](https://www.gyan.dev/ffmpeg/builds/) para audio y video).
+
 Doble clic en `Mandarina.exe` y respondé **Sí**. Se instala solo para tu usuario, sin permisos de administrador, en
 `%LOCALAPPDATA%\Programs\Mandarina`. Además:
 
