@@ -128,6 +128,34 @@ internal static class Native
     [DllImport("shcore.dll")]
     public static extern int GetDpiForMonitor(IntPtr hmonitor, int dpiType, out uint dpiX, out uint dpiY);
 
+    [DllImport("user32.dll")]
+    public static extern bool GetWindowRect(IntPtr hWnd, out RECT rect);
+
+    [DllImport("user32.dll")]
+    public static extern IntPtr GetForegroundWindow();
+
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+    public static extern int GetClassName(IntPtr hWnd, System.Text.StringBuilder name, int max);
+
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+    public static extern IntPtr FindWindowEx(IntPtr parent, IntPtr after, string? className, string? title);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    public static extern bool RegisterHotKey(IntPtr hWnd, int id, uint modifiers, uint vk);
+
+    [DllImport("user32.dll")]
+    public static extern bool UnregisterHotKey(IntPtr hWnd, int id);
+
+    public const uint MOD_ALT = 0x1, MOD_CONTROL = 0x2, MOD_SHIFT = 0x4, MOD_NOREPEAT = 0x4000;
+    public const int WM_HOTKEY = 0x0312;
+
+    public static string ClassOf(IntPtr hwnd)
+    {
+        var sb = new System.Text.StringBuilder(256);
+        GetClassName(hwnd, sb, sb.Capacity);
+        return sb.ToString();
+    }
+
     [DllImport("user32.dll", SetLastError = true)]
     public static extern uint SendInput(uint nInputs, INPUT[] pInputs, int cbSize);
 

@@ -12,37 +12,83 @@ public partial class App : Application
     private DragWatcher? _watcher;
     private WheelWindow? _wheel;
     private Tray? _tray;
+    private Hotkey? _hotkey;
+    private readonly List<string> _pendingOpen = [];
+    private System.Windows.Threading.DispatcherTimer? _openDebounce;
 
     protected override async void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
+        var args = e.Args;
 
-        if (e.Args.Length > 0 && e.Args[0].StartsWith("--"))
+        switch (args.FirstOrDefault())
         {
-            Shutdown(await Cli.RunAsync(e.Args));
-            return;
+            case "--install":
+                Installer.Install();
+                Installer.LaunchInstalled();
+                Shutdown();
+                return;
+            case "--uninstall":
+                Installer.Uninstall();
+                MessageBox.Show("Mandarina se desinstaló.", "Mandarina", MessageBoxButton.OK, MessageBoxImage.Information);
+                Shutdown();
+                return;
+            case "--open":
+                break;
+            case { } flag when flag.StartsWith("--"):
+                Shutdown(await Cli.RunAsync(args));
+                return;
         }
+
+        var toOpen = args.FirstOrDefault() == "--open" ? args[1..] : [];
 
         _singleInstance = new Mutex(true, @"Local\Mandarina", out bool first);
         if (!first)
         {
+            // Already running in the tray: hand over the files (or just show the help balloon).
+            InstancePipe.TrySend(toOpen.Length > 0 ? "open" : "help", toOpen);
+            Shutdown();
+            return;
+        }
+
+        if (args.Length == 0 && !Installer.IsRunningInstalled && OfferInstall())
+        {
+            _singleInstance.Dispose();
+            _singleInstance = null;
+            Installer.Install();
+            Installer.LaunchInstalled();
             Shutdown();
             return;
         }
 
         _tray = new Tray();
         _tray.ExitRequested += () => Shutdown();
+        _tray.UninstallRequested += () =>
+        {
+            if (MessageBox.Show("¿Desinstalar Mandarina? Se quita del menú contextual, del inicio y del menú Inicio.",
+                    "Mandarina", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes) return;
+            _singleInstance?.Dispose();
+            _singleInstance = null;
+            Installer.Uninstall();
+            Shutdown();
+        };
 
         _wheel = new WheelWindow();
         _wheel.ActionChosen += (action, files) => _ = RunAction(action, files);
 
         _watcher = new DragWatcher(Dispatcher);
-        _watcher.Triggered += (mode, pt) => _wheel.ShowAt(pt, mode);
+        _watcher.Triggered += (mode, pt) => { if (!_wheel.IsClickMode || !_wheel.IsOpen) _wheel.ShowAt(pt, mode); };
         _watcher.MouseReleased += () =>
         {
             // A drop on the wheel hides it itself; this covers releasing anywhere else.
-            Dispatcher.BeginInvoke(() => { if (_wheel.IsOpen) _wheel.HideWheel(); },
+            if (_wheel.IsClickMode) return;
+            Dispatcher.BeginInvoke(() => { if (_wheel.IsOpen && !_wheel.IsClickMode) _wheel.HideWheel(); },
                 System.Windows.Threading.DispatcherPriority.ApplicationIdle);
+        };
+        _watcher.MousePressed += pt =>
+        {
+            // Click mode: clicking anywhere outside the wheel closes it.
+            if (_wheel.IsOpen && _wheel.IsClickMode && !_wheel.Contains(pt)) _wheel.HideWheel();
         };
         _watcher.Escape += () => { if (_wheel.IsOpen) _wheel.HideWheel(); };
         _tray.EnabledChanged += on => _watcher.Enabled = on;
@@ -58,7 +104,66 @@ public partial class App : Application
             return;
         }
 
-        _tray.Notify("Mandarina está activa", "Arrastrá un archivo y tocá Mayús para convertirlo, o Alt para editarlo.");
+        _hotkey = new Hotkey(Native.MOD_CONTROL | Native.MOD_SHIFT, 'M');
+        _hotkey.Pressed += OpenExplorerSelection;
+
+        // Explorer launches one process per selected file; collect them for a moment and open one wheel.
+        _openDebounce = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromMilliseconds(350) };
+        _openDebounce.Tick += (_, _) =>
+        {
+            _openDebounce.Stop();
+            var files = _pendingOpen.Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+            _pendingOpen.Clear();
+            OpenWheel(files);
+        };
+        InstancePipe.Serve((command, paths) => Dispatcher.BeginInvoke(() =>
+        {
+            switch (command)
+            {
+                case "open": QueueOpen(paths); break;
+                case "help": _tray.ShowHelp(); break;
+                case "quit": Shutdown(); break;
+            }
+        }));
+
+        if (toOpen.Length > 0) QueueOpen(toOpen);
+        else _tray.Notify("Mandarina está activa",
+            "Arrastrá un archivo y tocá Mayús. O seleccionalo y apretá Ctrl+Mayús+M, o clic derecho → Convertir con Mandarina." +
+            (_hotkey.IsRegistered ? "" : " (Ctrl+Mayús+M ya lo usa otro programa.)"));
+    }
+
+    private static bool OfferInstall() =>
+        MessageBox.Show(
+            (Installer.IsInstalled ? "¿Actualizar la Mandarina instalada con esta versión?" : "¿Instalar Mandarina?") +
+            "\n\n• Clic derecho en un archivo → \"Convertir con Mandarina\"\n• Atajo Ctrl+Mayús+M con archivos seleccionados\n" +
+            "• Arranca sola con Windows y aparece en el menú Inicio\n\nNo necesita permisos de administrador. Con \"No\" se abre sin instalar.",
+            "Mandarina", MessageBoxButton.YesNo, MessageBoxImage.Question) == MessageBoxResult.Yes;
+
+    private void QueueOpen(IEnumerable<string> paths)
+    {
+        _pendingOpen.AddRange(paths);
+        _openDebounce!.Stop();
+        _openDebounce.Start();
+    }
+
+    private void OpenExplorerSelection()
+    {
+        IReadOnlyList<string> files;
+        try { files = ExplorerSelection.Get(); }
+        catch (Exception) { files = []; }
+        if (files.Count == 0)
+        {
+            _tray!.Notify("Nada seleccionado", "Seleccioná uno o más archivos en el Explorador o el escritorio y apretá Ctrl+Mayús+M.");
+            return;
+        }
+        OpenWheel(files);
+    }
+
+    private void OpenWheel(IReadOnlyList<string> files)
+    {
+        if (files.Count == 0 || !_watcher!.Enabled) return;
+        Native.GetCursorPos(out var pt);
+        _wheel!.ShowFor(files, pt, WheelMode.Convert);
     }
 
     private async Task RunAction(FileAction action, IReadOnlyList<string> files)
@@ -78,6 +183,7 @@ public partial class App : Application
 
     protected override void OnExit(ExitEventArgs e)
     {
+        _hotkey?.Dispose();
         _watcher?.Dispose();
         _tray?.Dispose();
         _singleInstance?.Dispose();

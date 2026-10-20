@@ -11,7 +11,8 @@
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <AssemblyName>Mandarina</AssemblyName>
     <RootNamespace>Mandarina</RootNamespace>
-    <Version>0.1.0</Version>
+    <Version>0.2.0</Version>
+    <ApplicationIcon>mandarina.ico</ApplicationIcon>
   </PropertyGroup>
 
   <ItemGroup>

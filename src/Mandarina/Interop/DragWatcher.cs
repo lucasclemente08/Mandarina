@@ -27,6 +27,7 @@ internal sealed class DragWatcher : IDisposable
     /// <summary>Raised on the UI thread when the gesture fires, with the cursor position in physical pixels.</summary>
     public event Action<WheelMode, Native.POINT>? Triggered;
     public event Action? MouseReleased;
+    public event Action<Native.POINT>? MousePressed;
     public event Action? Escape;
 
     public bool Enabled { get; set; } = true;
@@ -55,9 +56,12 @@ internal sealed class DragWatcher : IDisposable
             switch ((int)wParam)
             {
                 case Native.WM_LBUTTONDOWN:
+                    Log.Write("ldown");
                     _leftDown = true;
                     _dragging = false;
                     _downPt = data.pt;
+                    var downPt = data.pt;
+                    _dispatcher.BeginInvoke(() => MousePressed?.Invoke(downPt));
                     break;
                 case Native.WM_MOUSEMOVE:
                     _lastPt = data.pt;
@@ -65,7 +69,7 @@ internal sealed class DragWatcher : IDisposable
                     {
                         int dx = Math.Abs(data.pt.X - _downPt.X), dy = Math.Abs(data.pt.Y - _downPt.Y);
                         if (dx > Native.GetSystemMetrics(Native.SM_CXDRAG) || dy > Native.GetSystemMetrics(Native.SM_CYDRAG))
-                            _dragging = true;
+                            { _dragging = true; Log.Write("dragging"); }
                     }
                     break;
                 case Native.WM_LBUTTONUP:
@@ -109,6 +113,7 @@ internal sealed class DragWatcher : IDisposable
 
     private void Fire(WheelMode mode)
     {
+        Log.Write($"fire {mode} enabled={Enabled} dragging={_dragging}");
         if (!Enabled || !_dragging) return;
         var pt = _lastPt;
         _dispatcher.BeginInvoke(() => Triggered?.Invoke(mode, pt));

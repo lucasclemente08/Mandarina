@@ -20,6 +20,9 @@ public static class FileKinds
     public static readonly string[] PowerPoint = [".pptx", ".ppt", ".odp"];
     public static readonly string[] Markdown = [".md", ".markdown"];
 
+    public static IEnumerable<string> All =>
+        Image.Concat(Video).Concat(Audio).Concat(Pdf).Concat(Word).Concat(Excel).Concat(PowerPoint).Concat(Markdown);
+
     public static bool Is(string path, string[] kind) =>
         kind.Contains(Path.GetExtension(path).ToLowerInvariant());
 

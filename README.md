@@ -4,19 +4,31 @@ Conversor de archivos para Windows 11 que se usa arrastrando: empezás a arrastr
 tocás **Mayús** y aparece una rueda con los formatos posibles. Lo soltás sobre uno y listo:
 el resultado queda al lado del original. Inspirado en Tangerine (macOS). Todo corre sin conexión.
 
-## Uso
+## Instalar (1 clic)
 
-1. Ejecutá `dist\Mandarina.exe`. Aparece una mandarina en el área de notificación.
-2. Arrastrá uno o varios archivos (desde el Explorador, el escritorio, etc.).
-3. Sin soltar el botón:
-   - **Mayús** → rueda de **conversión** (PNG, JPG, MP4, MP3, PDF…)
-   - **Alt** → rueda de **edición** (rotar, comprimir, 720p, unir PDFs…)
-4. Soltá sobre una opción. Soltar en el centro o apretar **Esc** cancela.
+Doble clic en `Mandarina.exe` y respondé **Sí**. Se instala solo para tu usuario, sin permisos de administrador, en
+`%LOCALAPPDATA%\Programs\Mandarina`. Además:
 
-Al terminar aparece una notificación; si hacés clic, se abre la carpeta con el archivo seleccionado.
-El original nunca se modifica ni se mueve.
+- agrega **"Convertir con Mandarina"** al clic derecho del Explorador,
+- la arranca sola con Windows,
+- crea un acceso en el menú Inicio.
 
-Desde el menú del ícono podés pausarla o hacer que **inicie con Windows**.
+Para instalar sin preguntas: `Mandarina.exe --install`. Para quitarla: menú del ícono → **Desinstalar…**,
+o `Mandarina.exe --uninstall`.
+
+## Uso: tres formas de abrir la rueda
+
+| Forma | Cómo | Elegís con |
+|---|---|---|
+| **Arrastrar** | Empezá a arrastrar archivos y tocá **Mayús** (convertir) o **Alt** (editar) | soltando sobre la opción |
+| **Atajo** | Seleccioná archivos en el Explorador o el escritorio y apretá **Ctrl+Mayús+M** | un clic |
+| **Clic derecho** | Clic derecho → **Convertir con Mandarina** (en Windows 11 aparece en *Mostrar más opciones*) | un clic |
+
+En modo clic, hacer clic en el **centro** de la rueda alterna entre convertir y editar. **Esc**, o un clic
+fuera de la rueda, la cierra.
+
+El resultado queda al lado del original, que nunca se modifica. Al terminar aparece una notificación; si
+hacés clic, se abre la carpeta con el archivo seleccionado.
 
 ## Qué sabe hacer
 
@@ -46,7 +58,10 @@ Desde el menú del ícono podés pausarla o hacer que **inicie con Windows**.
 Mandarina.exe --list <archivos>                 # acciones disponibles
 Mandarina.exe --run <acción> <archivos>         # ejecuta una (ej. img.to.webp)
 Mandarina.exe --preview convert|edit out.png <archivos>   # dibuja la rueda en un PNG
+Mandarina.exe --open <archivos>                 # abre la rueda en modo clic (lo usa el menú contextual)
 ```
+
+Para diagnosticar problemas, definí la variable de entorno `MANDARINA_LOG=C:uta\log.txt` antes de abrirla.
 
 ## Compilar
 
@@ -58,6 +73,11 @@ dotnet publish src/Mandarina -c Release -r win-x64 --self-contained false -p:Pub
 
 - `Interop/DragWatcher.cs`: hooks globales de mouse y teclado (solo observan). Detecta "botón
   apretado + movimiento" y luego la pulsación de Mayús/Alt.
+- `Interop/InstancePipe.cs`: el Explorador abre un proceso por cada archivo seleccionado; esos procesos le pasan
+  los archivos por un *named pipe* a la instancia que ya corre, y esta los junta en una sola rueda.
+- `Interop/ExplorerSelection.cs`: lee la selección de la ventana del Explorador activa (incluida la pestaña activa
+  de Windows 11) o del escritorio, para el atajo.
+- `Installer.cs`: instalación por usuario (copia, menú contextual, inicio con Windows y acceso directo).
 - `UI/WheelWindow.cs`: ventana transparente, siempre visible y sin foco, centrada en el cursor. Es un
   destino de arrastre OLE: recibe la lista de archivos y devuelve "copiar", así el origen nunca borra el original.
 - `Actions/`: catálogo de acciones por tipo de archivo. Imágenes con WIC (WPF), audio y video con
@@ -67,4 +87,6 @@ dotnet publish src/Mandarina -c Release -r win-x64 --self-contained false -p:Pub
 
 - No ve arrastres desde aplicaciones que corren como administrador (restricción de Windows/UIPI).
 - "Unir" video necesita clips con la misma resolución y con pista de audio.
+- En Windows 11 la entrada del clic derecho aparece en "Mostrar más opciones" (Mayús+F10). Para que salga en
+  el menú corto, la app tendría que estar empaquetada y firmada (MSIX).
 - PDF → Word no está incluido: Word se cuelga al hacerlo por automatización.

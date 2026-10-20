@@ -1,5 +1,6 @@
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
 using System.Windows.Interop;
 using System.Windows.Media;
 using System.Windows.Shapes;
@@ -57,6 +58,9 @@ internal sealed class WheelWindow : Window
         DragOver += OnDragOver;
         Drop += OnDrop;
         DragLeave += (_, _) => SetHover(-1);
+        MouseMove += (_, e) => { if (IsClickMode) SetHover(HitTest(e.GetPosition(_canvas))); };
+        MouseLeave += (_, _) => { if (IsClickMode) SetHover(-1); };
+        MouseLeftButtonUp += OnClick;
 
         _enterTimeout = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(700) };
         _enterTimeout.Tick += (_, _) =>
@@ -76,6 +80,10 @@ internal sealed class WheelWindow : Window
 
     public bool IsOpen => IsVisible;
 
+    /// <summary>True when opened from the context menu or hotkey: pick with a click instead of a drop.</summary>
+    public bool IsClickMode { get; private set; }
+
+    /// <summary>Drag mode: opens empty under the cursor and waits for the dragged files to enter.</summary>
     public void ShowAt(Native.POINT pt, WheelMode mode)
     {
         if (IsVisible)
@@ -85,12 +93,41 @@ internal sealed class WheelWindow : Window
             return;
         }
 
+        Log.Write("ShowAt");
+        IsClickMode = false;
         _mode = mode;
         _files = [];
         _actions = [];
         _gotDrag = false;
         Rebuild();
+        PlaceAt(pt);
 
+        // Let the window paint, then nudge the cursor so the drag loop notices us.
+        Dispatcher.BeginInvoke(DispatcherPriority.Background, Native.JiggleMouse);
+        _enterTimeout.Start();
+    }
+
+    /// <summary>Click mode: opens with known files (context menu, hotkey); a click on a slice runs it.</summary>
+    public void ShowFor(IReadOnlyList<string> files, Native.POINT pt, WheelMode mode)
+    {
+        _enterTimeout.Stop();
+        IsClickMode = true;
+        _mode = mode;
+        _files = files;
+        Rebuild();
+        if (!IsVisible) PlaceAt(pt);
+    }
+
+    /// <summary>Whether a screen point (physical pixels) falls inside the wheel window.</summary>
+    public bool Contains(Native.POINT pt)
+    {
+        if (!IsVisible) return false;
+        Native.GetWindowRect(new WindowInteropHelper(this).Handle, out var r);
+        return pt.X >= r.Left && pt.X < r.Right && pt.Y >= r.Top && pt.Y < r.Bottom;
+    }
+
+    private void PlaceAt(Native.POINT pt)
+    {
         double scale = Native.ScaleForPoint(pt);
         int side = (int)Math.Round(Size * scale);
         var work = Native.WorkAreaForPoint(pt);
@@ -100,10 +137,27 @@ internal sealed class WheelWindow : Window
         Show();
         var hwnd = new WindowInteropHelper(this).Handle;
         Native.SetWindowPos(hwnd, Native.HWND_TOPMOST, x, y, side, side, Native.SWP_NOACTIVATE | Native.SWP_SHOWWINDOW);
+    }
 
-        // Let the window paint, then nudge the cursor so the drag loop notices us.
-        Dispatcher.BeginInvoke(DispatcherPriority.Background, Native.JiggleMouse);
-        _enterTimeout.Start();
+    private void OnClick(object sender, MouseButtonEventArgs e)
+    {
+        if (!IsClickMode) return;
+        e.Handled = true;
+        var p = e.GetPosition(_canvas);
+        double dx = p.X - C, dy = p.Y - C;
+        if (dx * dx + dy * dy < CenterRadius * CenterRadius)
+        {
+            // The center toggles between convert and edit.
+            _mode = _mode == WheelMode.Convert ? WheelMode.Edit : WheelMode.Convert;
+            Rebuild();
+            return;
+        }
+        int hit = HitTest(p);
+        if (hit < 0 || hit >= _actions.Count) return;
+        var action = _actions[hit];
+        var files = _files;
+        HideWheel();
+        ActionChosen?.Invoke(action, files);
     }
 
     public void HideWheel()
@@ -121,6 +175,7 @@ internal sealed class WheelWindow : Window
             e.Effects = DragDropEffects.None;
             return;
         }
+        if (!_gotDrag) Log.Write("drag entered");
         _gotDrag = true;
 
         var files = (string[])e.Data.GetData(DataFormats.FileDrop);
@@ -138,6 +193,7 @@ internal sealed class WheelWindow : Window
 
     private void OnDrop(object sender, DragEventArgs e)
     {
+        Log.Write("drop");
         e.Handled = true;
         int hit = HitTest(e.GetPosition(_canvas));
         var files = _files;
@@ -249,7 +305,9 @@ internal sealed class WheelWindow : Window
             _ => $"{_files.Count} archivos",
         };
         if (_files.Count > 0 && _actions.Count == 0) sub = "Sin acciones para este tipo";
-        string hint = _mode == WheelMode.Convert ? "Alt: editar" : "Mayús: convertir";
+        string hint = IsClickMode
+            ? (_mode == WheelMode.Convert ? "Clic aquí: editar" : "Clic aquí: convertir")
+            : (_mode == WheelMode.Convert ? "Alt: editar" : "Mayús: convertir");
 
         var stack = new StackPanel { Width = CenterRadius * 2 - 14, IsHitTestVisible = false };
         stack.Children.Add(new TextBlock { Text = title, Foreground = Accent, FontSize = 15, FontWeight = FontWeights.Bold, TextAlignment = TextAlignment.Center });

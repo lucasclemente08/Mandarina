@@ -18,6 +18,7 @@ internal sealed class Tray : IDisposable
 
     public event Action<bool>? EnabledChanged;
     public event Action? ExitRequested;
+    public event Action? UninstallRequested;
 
     public Tray()
     {
@@ -33,6 +34,7 @@ internal sealed class Tray : IDisposable
         menu.Items.Add(_enabledItem);
         menu.Items.Add(_startupItem);
         menu.Items.Add("Cómo se usa", null, (_, _) => ShowHelp());
+        menu.Items.Add("Desinstalar…", null, (_, _) => UninstallRequested?.Invoke());
         menu.Items.Add(new Forms.ToolStripSeparator());
         menu.Items.Add("Salir", null, (_, _) => ExitRequested?.Invoke());
 
@@ -48,8 +50,9 @@ internal sealed class Tray : IDisposable
     }
 
     public void ShowHelp() => Balloon("Cómo se usa",
-        "Empezá a arrastrar un archivo y, sin soltarlo, tocá Mayús (convertir) o Alt (editar). " +
-        "Soltalo sobre una opción de la rueda. Esc cancela.", Forms.ToolTipIcon.Info);
+        "• Arrastrá un archivo y tocá Mayús (convertir) o Alt (editar); soltalo sobre una opción.\n" +
+        "• O seleccioná archivos y apretá Ctrl+Mayús+M, o clic derecho → Convertir con Mandarina; elegí con un clic.\n" +
+        "Esc cancela.", Forms.ToolTipIcon.Info);
 
     public void Started(string what)
     {
@@ -84,7 +87,7 @@ internal sealed class Tray : IDisposable
     {
         var text = !_enabledItem.Checked ? "Mandarina (pausado)"
             : _busy > 0 ? $"Mandarina: {what ?? "trabajando…"}"
-            : "Mandarina: arrastrá + Mayús";
+            : "Mandarina: arrastrá + Mayús, o Ctrl+Mayús+M";
         _icon.Text = text.Length > 63 ? text[..63] : text;
     }
 
@@ -110,19 +113,24 @@ internal sealed class Tray : IDisposable
         }
     }
 
-    /// <summary>A small tangerine: orange circle with a green leaf.</summary>
+    /// <summary>The exe's own icon (a tangerine), falling back to a drawn one.</summary>
     private static Icon DrawIcon()
     {
+        try
+        {
+            var own = Icon.ExtractAssociatedIcon(Environment.ProcessPath!);
+            if (own is not null) return new Icon(own, Forms.SystemInformation.SmallIconSize);
+        }
+        catch (Exception) { }
+
         using var bmp = new Bitmap(32, 32);
         using (var g = Graphics.FromImage(bmp))
         {
             g.SmoothingMode = SmoothingMode.AntiAlias;
-            using var fruit = new LinearGradientBrush(new Rectangle(3, 7, 26, 24), Color.FromArgb(255, 176, 64), Color.FromArgb(234, 110, 20), 60f);
+            using var fruit = new SolidBrush(Color.FromArgb(240, 130, 30));
             g.FillEllipse(fruit, 3, 7, 26, 24);
             using var leaf = new SolidBrush(Color.FromArgb(76, 160, 70));
             g.FillEllipse(leaf, 15, 1, 11, 7);
-            using var shine = new SolidBrush(Color.FromArgb(110, 255, 255, 255));
-            g.FillEllipse(shine, 8, 11, 7, 5);
         }
         return Icon.FromHandle(bmp.GetHicon());
     }
