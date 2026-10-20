@@ -18,7 +18,12 @@ Doble clic en `Mandarina.exe` y respondé **Sí**. Se instala solo para tu usuar
 Para instalar sin preguntas: `Mandarina.exe --install`. Para quitarla: menú del ícono → **Desinstalar…**,
 o `Mandarina.exe --uninstall`.
 
-## Uso: tres formas de abrir la rueda
+## Uso
+
+La forma más simple: abrí **Mandarina** desde el menú Inicio (o con clic en el ícono naranja de la bandeja),
+**soltá los archivos** en la ventana o hacé clic para elegirlos, y tocá el botón del formato que querés.
+
+Para ir más rápido, hay tres atajos que abren la rueda:
 
 | Forma | Cómo | Elegís con |
 |---|---|---|
@@ -37,10 +42,11 @@ hacés clic, se abre la carpeta con el archivo seleccionado.
 | Tipo | Convertir (Mayús) | Editar (Alt) |
 |---|---|---|
 | Imágenes (png, jpg, webp, gif, bmp, tiff, ico, heic, avif) | PNG, JPG, WEBP, GIF, BMP, TIFF, ICO (multi-tamaño), AVIF, PDF (varias → un PDF) | 50 %, máx 1920 px, rotar, espejo, blanco y negro, sin metadatos, comprimir |
+| Texto (txt, log) | PDF, DOCX, HTML, Markdown, RTF, CSV (sin Office; detecta acentos de archivos viejos) | unir varios |
 | Video (mp4, mkv, mov, avi, webm, …) | MP4, MKV, WEBM, MOV, AVI, GIF, y audio MP3/WAV/M4A/OGG/FLAC/OPUS | comprimir, 720p, 480p, sin audio, rotar, ×2, fotograma PNG, unir |
 | Audio (mp3, wav, m4a, ogg, flac, …) | MP3, WAV, M4A, OGG, FLAC, OPUS | comprimir, mono, normalizar, quitar silencios, ×1.5, unir |
 | PDF | PNG / JPG (una imagen por página) | unir, separar páginas, rotar, invertir orden, comprimir |
-| Word (docx, doc, odt, rtf, txt, html) | PDF, DOCX, ODT, RTF, TXT, HTML | — |
+| Word (docx, doc, odt, rtf, html) | PDF, DOCX, ODT, RTF, TXT, HTML | — |
 | Excel (xlsx, xls, ods, csv) | PDF, XLSX, CSV, ODS | — |
 | PowerPoint (pptx, ppt, odp) | PDF, PPTX, ODP | — |
 | Markdown | DOCX, HTML, ODT, RTF (con Pandoc) | — |
@@ -89,6 +95,8 @@ dotnet publish src/Mandarina -c Release -r win-x64 --self-contained false -p:Pub
 
 - No ve arrastres desde aplicaciones que corren como administrador (restricción de Windows/UIPI).
 - "Unir" video necesita clips con la misma resolución y con pista de audio.
-- En Windows 11 la entrada del clic derecho aparece en "Mostrar más opciones" (Mayús+F10). Para que salga en
-  el menú corto, la app tendría que estar empaquetada y firmada (MSIX).
+- En Windows 11 la entrada del clic derecho aparece en "Mostrar más opciones" (Mayús+F10). Windows solo pone
+  en el menú corto a las apps empaquetadas y firmadas (MSIX). Alternativa: en el menú del ícono, activá
+  **"Mandarina directo en el clic derecho"**, que vuelve al menú completo de Windows 10 en todo el sistema
+  (reversible desde el mismo lugar).
 - PDF → Word no está incluido: Word se cuelga al hacerlo por automatización.

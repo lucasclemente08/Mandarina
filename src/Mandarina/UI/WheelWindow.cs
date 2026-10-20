@@ -23,13 +23,12 @@ internal sealed class WheelWindow : Window
     private static readonly (double inner, double outer, int capacity)[] Rings = [(CenterRadius, 145, 8), (145, 226, 16)];
 
     private static readonly Brush SliceFill = Frozen(new SolidColorBrush(Color.FromArgb(235, 32, 30, 34)));
-    private static readonly Brush SliceHover = Frozen(new SolidColorBrush(Color.FromRgb(242, 133, 34)));
     private static readonly Brush SliceStroke = Frozen(new SolidColorBrush(Color.FromArgb(90, 255, 255, 255)));
     private static readonly Brush CenterFill = Frozen(new SolidColorBrush(Color.FromArgb(245, 20, 19, 22)));
     private static readonly Brush Accent = Frozen(new SolidColorBrush(Color.FromRgb(255, 166, 77)));
 
     private readonly Canvas _canvas = new() { Width = Size, Height = Size };
-    private readonly List<(Path shape, TextBlock label, double inner, double outer, double a0, double a1)> _slices = [];
+    private readonly List<(Path shape, TextBlock icon, Brush color, double inner, double outer, double a0, double a1)> _slices = [];
     private readonly DispatcherTimer _enterTimeout;
 
     private WheelMode _mode;
@@ -220,9 +219,18 @@ internal sealed class WheelWindow : Window
     private void SetHover(int index)
     {
         if (index == _hover) return;
-        if (_hover >= 0 && _hover < _slices.Count) _slices[_hover].shape.Fill = SliceFill;
+        if (_hover >= 0 && _hover < _slices.Count)
+        {
+            _slices[_hover].shape.Fill = SliceFill;
+            _slices[_hover].icon.Foreground = _slices[_hover].color;
+        }
         _hover = index;
-        if (_hover >= 0 && _hover < _slices.Count) _slices[_hover].shape.Fill = SliceHover;
+        if (_hover >= 0 && _hover < _slices.Count)
+        {
+            // Hovered slice fills with its own color; the icon turns white to stay visible.
+            _slices[_hover].shape.Fill = _slices[_hover].color;
+            _slices[_hover].icon.Foreground = Brushes.White;
+        }
     }
 
     private void Rebuild()
@@ -243,7 +251,7 @@ internal sealed class WheelWindow : Window
             for (int i = 0; i < count; i++, index++)
             {
                 double a0 = i * step, a1 = a0 + step;
-                AddSlice(_actions[index].Label, inner, outer, a0, a1);
+                AddSlice(_actions[index], inner, outer, a0, a1);
             }
             remaining -= count;
         }
@@ -251,8 +259,10 @@ internal sealed class WheelWindow : Window
         AddCenter();
     }
 
-    private void AddSlice(string text, double inner, double outer, double a0, double a1)
+    private void AddSlice(FileAction action, double inner, double outer, double a0, double a1)
     {
+        var (glyph, color) = ActionStyle.For(action);
+        var colorBrush = Frozen(new SolidColorBrush(color));
         var shape = new Path
         {
             Data = Sector(inner, outer, a0, a1),
@@ -263,24 +273,36 @@ internal sealed class WheelWindow : Window
         _canvas.Children.Add(shape);
 
         double mid = (a0 + a1) / 2 * Math.PI / 180, rm = (inner + outer) / 2;
+        double width = Math.Min(outer - inner + 10, 2 * Math.PI * rm * (a1 - a0) / 360 - 6);
+        string text = action.Label;
+        var icon = new TextBlock
+        {
+            Text = glyph,
+            FontFamily = ActionStyle.IconFont,
+            FontSize = 20,
+            Foreground = colorBrush,
+            HorizontalAlignment = HorizontalAlignment.Center,
+            Margin = new Thickness(0, 0, 0, 3),
+        };
         var label = new TextBlock
         {
             Text = text,
             Foreground = Brushes.White,
-            FontSize = text.Length > 9 ? 12 : 14,
+            FontSize = text.Length > 9 ? 11.5 : 13.5,
             FontWeight = FontWeights.SemiBold,
             FontFamily = new FontFamily("Segoe UI Variable Text, Segoe UI"),
             TextAlignment = TextAlignment.Center,
             TextWrapping = TextWrapping.Wrap,
-            Width = Math.Min(outer - inner + 10, 2 * Math.PI * rm * (a1 - a0) / 360 - 6),
-            IsHitTestVisible = false,
         };
-        label.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
-        Canvas.SetLeft(label, C + rm * Math.Sin(mid) - label.Width / 2);
-        Canvas.SetTop(label, C - rm * Math.Cos(mid) - label.DesiredSize.Height / 2);
-        _canvas.Children.Add(label);
+        var stack = new StackPanel { Width = width, IsHitTestVisible = false };
+        stack.Children.Add(icon);
+        stack.Children.Add(label);
+        stack.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+        Canvas.SetLeft(stack, C + rm * Math.Sin(mid) - width / 2);
+        Canvas.SetTop(stack, C - rm * Math.Cos(mid) - stack.DesiredSize.Height / 2);
+        _canvas.Children.Add(stack);
 
-        _slices.Add((shape, label, inner, outer, a0, a1));
+        _slices.Add((shape, icon, colorBrush, inner, outer, a0, a1));
     }
 
     private void AddCenter()

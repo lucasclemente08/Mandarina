@@ -11,7 +11,7 @@
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <AssemblyName>Mandarina</AssemblyName>
     <RootNamespace>Mandarina</RootNamespace>
-    <Version>0.2.0</Version>
+    <Version>0.3.0</Version>
     <ApplicationIcon>mandarina.ico</ApplicationIcon>
   </PropertyGroup>
 
@@ -19,6 +19,10 @@
     <!-- WinForms and WPF both define these names; keep the WPF/System ones implicit. -->
     <Using Remove="System.Windows.Forms" />
     <Using Remove="System.Drawing" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Resource Include="mandarina.ico" />
   </ItemGroup>
 
   <ItemGroup>

@@ -13,6 +13,7 @@ public partial class App : Application
     private WheelWindow? _wheel;
     private Tray? _tray;
     private Hotkey? _hotkey;
+    private MainWindow? _main;
     private readonly List<string> _pendingOpen = [];
     private System.Windows.Threading.DispatcherTimer? _openDebounce;
 
@@ -34,6 +35,8 @@ public partial class App : Application
                 Shutdown();
                 return;
             case "--open":
+            case "--window":
+            case "--background":
                 break;
             case { } flag when flag.StartsWith("--"):
                 Shutdown(await Cli.RunAsync(args));
@@ -41,12 +44,14 @@ public partial class App : Application
         }
 
         var toOpen = args.FirstOrDefault() == "--open" ? args[1..] : [];
+        var toWindow = args.FirstOrDefault() == "--window" ? args[1..] : [];
 
         _singleInstance = new Mutex(true, @"Local\Mandarina", out bool first);
         if (!first)
         {
-            // Already running in the tray: hand over the files (or just show the help balloon).
-            InstancePipe.TrySend(toOpen.Length > 0 ? "open" : "help", toOpen);
+            // Already running in the tray: hand over the files, or bring up the window.
+            if (toOpen.Length > 0) InstancePipe.TrySend("open", toOpen);
+            else if (args.Length == 0 || toWindow.Length > 0) InstancePipe.TrySend("show", toWindow);
             Shutdown();
             return;
         }
@@ -63,6 +68,8 @@ public partial class App : Application
 
         _tray = new Tray();
         _tray.ExitRequested += () => Shutdown();
+        _tray.ShowRequested += ShowMain;
+        _tray.ClassicMenuRequested += SetClassicMenu;
         _tray.UninstallRequested += () =>
         {
             if (MessageBox.Show("¿Desinstalar Mandarina? Se quita del menú contextual, del inicio y del menú Inicio.",
@@ -74,7 +81,7 @@ public partial class App : Application
         };
 
         _wheel = new WheelWindow();
-        _wheel.ActionChosen += (action, files) => _ = RunAction(action, files);
+        _wheel.ActionChosen += (action, files) => _ = RunAction(action, files).ContinueWith(_ => { }, TaskScheduler.Default);
 
         _watcher = new DragWatcher(Dispatcher);
         _watcher.Triggered += (mode, pt) => { if (!_wheel.IsClickMode || !_wheel.IsOpen) _wheel.ShowAt(pt, mode); };
@@ -122,11 +129,13 @@ public partial class App : Application
             {
                 case "open": QueueOpen(paths); break;
                 case "help": _tray.ShowHelp(); break;
+                case "show": ShowMain(paths); break;
                 case "quit": Shutdown(); break;
             }
         }));
 
         if (toOpen.Length > 0) QueueOpen(toOpen);
+        else if (args.Length == 0 || toWindow.Length > 0) ShowMain(toWindow);
         else _tray.Notify("Mandarina está activa",
             "Arrastrá un archivo y tocá Mayús. O seleccionalo y apretá Ctrl+Mayús+M, o clic derecho → Convertir con Mandarina." +
             (_hotkey.IsRegistered ? "" : " (Ctrl+Mayús+M ya lo usa otro programa.)"));
@@ -166,18 +175,44 @@ public partial class App : Application
         _wheel!.ShowFor(files, pt, WheelMode.Convert);
     }
 
-    private async Task RunAction(FileAction action, IReadOnlyList<string> files)
+    private void ShowMain() => ShowMain([]);
+
+    private void ShowMain(IReadOnlyList<string> files)
+    {
+        _main ??= new MainWindow(RunAction);
+        if (files.Count > 0) _main.SetFiles(files);
+        _main.ShowAndActivate();
+    }
+
+    private void SetClassicMenu(bool on)
+    {
+        var question = on
+            ? "Esto vuelve al menú de clic derecho completo de Windows (el de Windows 10) en todo el sistema, " +
+              "así \"Convertir con Mandarina\" aparece directo sin \"Mostrar más opciones\".\n\n" +
+              "Para aplicarlo hay que reiniciar el Explorador: se cierran las ventanas de carpetas abiertas.\n\n¿Continuar?"
+            : "Vuelve al menú corto de Windows 11. Hay que reiniciar el Explorador (se cierran las ventanas de carpetas).\n\n¿Continuar?";
+        if (MessageBox.Show(question, "Mandarina", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes) return;
+        ClassicMenu.Set(on);
+        ClassicMenu.RestartExplorer();
+    }
+
+    /// <summary>Runs an action, reporting progress in the tray; rethrows so the window can show errors too.</summary>
+    private async Task<IReadOnlyList<string>> RunAction(FileAction action, IReadOnlyList<string> files)
     {
         var what = files.Count == 1 ? $"{action.Label} ← {Path.GetFileName(files[0])}" : $"{action.Label} ({files.Count} archivos)";
+        // The window shows its own status; only use balloons when it is not in front.
+        bool quiet = _main is { IsActive: true };
         _tray!.Started(what);
         try
         {
             var outputs = await Task.Run(() => action.Run(files, CancellationToken.None));
-            _tray.Finished(outputs);
+            _tray.Finished(outputs, balloon: !quiet);
+            return outputs;
         }
         catch (Exception ex)
         {
-            _tray.Failed(ex.Message);
+            _tray.Failed(ex.Message, balloon: !quiet);
+            throw;
         }
     }
 

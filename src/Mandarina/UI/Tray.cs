@@ -19,6 +19,8 @@ internal sealed class Tray : IDisposable
     public event Action<bool>? EnabledChanged;
     public event Action? ExitRequested;
     public event Action? UninstallRequested;
+    public event Action? ShowRequested;
+    public event Action<bool>? ClassicMenuRequested;
 
     public Tray()
     {
@@ -29,10 +31,19 @@ internal sealed class Tray : IDisposable
         _startupItem.CheckedChanged += (_, _) => StartsWithWindows = _startupItem.Checked;
 
         var menu = new Forms.ContextMenuStrip();
-        menu.Items.Add(new Forms.ToolStripMenuItem("Mandarina") { Enabled = false });
+        var open = new Forms.ToolStripMenuItem("Abrir Mandarina", null, (_, _) => ShowRequested?.Invoke());
+        open.Font = new Font(open.Font, FontStyle.Bold);
+        menu.Items.Add(open);
         menu.Items.Add(new Forms.ToolStripSeparator());
         menu.Items.Add(_enabledItem);
         menu.Items.Add(_startupItem);
+        if (Mandarina.Interop.ClassicMenu.IsWindows11)
+        {
+            var classic = new Forms.ToolStripMenuItem("Mandarina directo en el clic derecho") { Checked = Mandarina.Interop.ClassicMenu.IsEnabled };
+            classic.Click += (_, _) => ClassicMenuRequested?.Invoke(!classic.Checked);
+            menu.Opening += (_, _) => classic.Checked = Mandarina.Interop.ClassicMenu.IsEnabled;
+            menu.Items.Add(classic);
+        }
         menu.Items.Add("Cómo se usa", null, (_, _) => ShowHelp());
         menu.Items.Add("Desinstalar…", null, (_, _) => UninstallRequested?.Invoke());
         menu.Items.Add(new Forms.ToolStripSeparator());
@@ -45,7 +56,7 @@ internal sealed class Tray : IDisposable
             Visible = true,
         };
         _icon.BalloonTipClicked += (_, _) => Reveal(_revealOnClick);
-        _icon.DoubleClick += (_, _) => ShowHelp();
+        _icon.MouseClick += (_, e) => { if (e.Button == Forms.MouseButtons.Left) ShowRequested?.Invoke(); };
         UpdateText();
     }
 
@@ -60,18 +71,20 @@ internal sealed class Tray : IDisposable
         UpdateText(what);
     }
 
-    public void Finished(IReadOnlyList<string> outputs)
+    public void Finished(IReadOnlyList<string> outputs, bool balloon = true)
     {
         _busy = Math.Max(0, _busy - 1);
         UpdateText();
+        if (!balloon) return;
         var names = string.Join(", ", outputs.Select(Path.GetFileName).Take(3)) + (outputs.Count > 3 ? "…" : "");
         Balloon("Listo", names, Forms.ToolTipIcon.Info, outputs.FirstOrDefault());
     }
 
-    public void Failed(string error)
+    public void Failed(string error, bool balloon = true)
     {
         _busy = Math.Max(0, _busy - 1);
         UpdateText();
+        if (!balloon) return;
         Balloon("No se pudo completar", error, Forms.ToolTipIcon.Error);
     }
 
@@ -108,7 +121,7 @@ internal sealed class Tray : IDisposable
         set
         {
             using var key = Registry.CurrentUser.CreateSubKey(RunKey);
-            if (value) key.SetValue("Mandarina", $"\"{Environment.ProcessPath}\"");
+            if (value) key.SetValue("Mandarina", $"\"{Environment.ProcessPath}\" --background");
             else key.DeleteValue("Mandarina", throwOnMissingValue: false);
         }
     }

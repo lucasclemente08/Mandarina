@@ -41,7 +41,7 @@ internal static class Installer
             cmd.SetValue("", $"\"{exe}\" --open \"%1\"");
         }
         using (var run = Registry.CurrentUser.CreateSubKey(RunKey))
-            run.SetValue("Mandarina", $"\"{exe}\"");
+            run.SetValue("Mandarina", $"\"{exe}\" --background");
 
         CreateShortcut(Shortcut, exe);
     }
@@ -53,6 +53,7 @@ internal static class Installer
         using (var run = Registry.CurrentUser.CreateSubKey(RunKey))
             run.DeleteValue("Mandarina", throwOnMissingValue: false);
         try { File.Delete(Shortcut); } catch { }
+        if (ClassicMenu.EnabledByMandarina) ClassicMenu.Set(false);
 
         if (IsRunningInstalled)
         {

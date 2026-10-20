@@ -15,13 +15,14 @@ public static class FileKinds
     public static readonly string[] Video = [".mp4", ".mkv", ".mov", ".avi", ".webm", ".wmv", ".flv", ".m4v", ".mpg", ".mpeg", ".3gp", ".ts"];
     public static readonly string[] Audio = [".mp3", ".wav", ".m4a", ".aac", ".ogg", ".oga", ".opus", ".flac", ".wma", ".aiff", ".aif"];
     public static readonly string[] Pdf = [".pdf"];
-    public static readonly string[] Word = [".docx", ".doc", ".odt", ".rtf", ".txt", ".htm", ".html"];
+    public static readonly string[] Word = [".docx", ".doc", ".odt", ".rtf", ".htm", ".html"];
+    public static readonly string[] Text = [".txt", ".log"];
     public static readonly string[] Excel = [".xlsx", ".xls", ".ods", ".csv"];
     public static readonly string[] PowerPoint = [".pptx", ".ppt", ".odp"];
     public static readonly string[] Markdown = [".md", ".markdown"];
 
     public static IEnumerable<string> All =>
-        Image.Concat(Video).Concat(Audio).Concat(Pdf).Concat(Word).Concat(Excel).Concat(PowerPoint).Concat(Markdown);
+        Image.Concat(Video).Concat(Audio).Concat(Pdf).Concat(Word).Concat(Text).Concat(Excel).Concat(PowerPoint).Concat(Markdown);
 
     public static bool Is(string path, string[] kind) =>
         kind.Contains(Path.GetExtension(path).ToLowerInvariant());

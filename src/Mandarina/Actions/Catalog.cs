@@ -10,6 +10,7 @@ public static class Catalog
         return ImageActions.For(files)
             .Concat(MediaActions.For(files))
             .Concat(PdfActions.For(files))
+            .Concat(TextActions.For(files))
             .Concat(OfficeActions.For(files))
             .ToList();
     }
