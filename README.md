@@ -61,7 +61,7 @@ Mandarina.exe --preview convert|edit out.png <archivos>   # dibuja la rueda en u
 Mandarina.exe --open <archivos>                 # abre la rueda en modo clic (lo usa el menú contextual)
 ```
 
-Para diagnosticar problemas, definí la variable de entorno `MANDARINA_LOG=C:	emp\mandarina.log` antes de abrirla.
+Para diagnosticar problemas, definí la variable de entorno `MANDARINA_LOG=C:\temp\mandarina.log` antes de abrirla.
 
 ## Compilar
 
