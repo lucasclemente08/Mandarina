@@ -21,6 +21,9 @@ public partial class App : Application
     {
         base.OnStartup(e);
         var args = e.Args;
+        // The UI is simple; software rendering avoids GPU-driver crashes (seen in atidxx64.dll) in a tray app that runs all day.
+        System.Windows.Media.RenderOptions.ProcessRenderMode = System.Windows.Interop.RenderMode.SoftwareOnly;
+        Log.Write($"start pid={Environment.ProcessId} args=[{string.Join(" | ", args)}] cwd={Environment.CurrentDirectory}");
 
         switch (args.FirstOrDefault())
         {
@@ -49,6 +52,7 @@ public partial class App : Application
         _singleInstance = new Mutex(true, @"Local\Mandarina", out bool first);
         if (!first)
         {
+            Log.Write("another instance is running: forwarding");
             // Already running in the tray: hand over the files, or bring up the window.
             if (toOpen.Length > 0) InstancePipe.TrySend("open", toOpen);
             else if (args.Length == 0 || toWindow.Length > 0) InstancePipe.TrySend("show", toWindow);
@@ -125,6 +129,7 @@ public partial class App : Application
         };
         InstancePipe.Serve((command, paths) => Dispatcher.BeginInvoke(() =>
         {
+            Log.Write($"pipe {command} [{string.Join(" | ", paths)}]");
             switch (command)
             {
                 case "open": QueueOpen(paths); break;
@@ -137,7 +142,7 @@ public partial class App : Application
         if (toOpen.Length > 0) QueueOpen(toOpen);
         else if (args.Length == 0 || toWindow.Length > 0) ShowMain(toWindow);
         else _tray.Notify("Mandarina está activa",
-            "Arrastrá un archivo y tocá Mayús. O seleccionalo y apretá Ctrl+Mayús+M, o clic derecho → Convertir con Mandarina." +
+            "Arrastrá un archivo y tocá Mayús. O seleccionalo y apretá Ctrl+Mayús+M, o clic derecho → Abrir con → Mandarina." +
             (_hotkey.IsRegistered ? "" : " (Ctrl+Mayús+M ya lo usa otro programa.)"));
     }
 
@@ -170,7 +175,8 @@ public partial class App : Application
 
     private void OpenWheel(IReadOnlyList<string> files)
     {
-        if (files.Count == 0 || !_watcher!.Enabled) return;
+        Log.Write($"OpenWheel {files.Count} files, enabled={_watcher!.Enabled}");
+        if (files.Count == 0 || !_watcher.Enabled) return;
         Native.GetCursorPos(out var pt);
         _wheel!.ShowFor(files, pt, WheelMode.Convert);
     }

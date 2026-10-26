@@ -13,6 +13,8 @@ internal static class Installer
 {
     private const string MenuKey = @"Software\Classes\*\shell\Mandarina";
     private const string RunKey = @"Software\Microsoft\Windows\CurrentVersion\Run";
+    private const string ProgId = "Mandarina.Convertir";
+    private const string ClassesKey = @"Software\Classes";
 
     public static string InstallDir => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Programs", "Mandarina");
     public static string InstalledExe => Path.Combine(InstallDir, "Mandarina.exe");
@@ -40,16 +42,77 @@ internal static class Installer
             using var cmd = menu.CreateSubKey("command");
             cmd.SetValue("", $"\"{exe}\" --open \"%1\"");
         }
+        RegisterOpenWith(exe);
         using (var run = Registry.CurrentUser.CreateSubKey(RunKey))
             run.SetValue("Mandarina", $"\"{exe}\" --background");
 
         CreateShortcut(Shortcut, exe);
+        NotifyAssociationsChanged();
     }
+
+    /// <summary>
+    /// Windows 11's short right-click menu only takes packaged apps, but it always has "Abrir con".
+    /// Listing Mandarina there (OpenWithProgids) puts it one click away without changing any
+    /// file's default program.
+    /// </summary>
+    private static void RegisterOpenWith(string exe)
+    {
+        using (var prog = Registry.CurrentUser.CreateSubKey($@"{ClassesKey}\{ProgId}"))
+        {
+            prog.SetValue("", "Convertir con Mandarina");
+            prog.SetValue("FriendlyTypeName", "Convertir con Mandarina");
+            using (var app = prog.CreateSubKey("Application"))
+            {
+                app.SetValue("ApplicationName", "Mandarina");
+                app.SetValue("ApplicationDescription", "Convertir y editar archivos");
+                app.SetValue("ApplicationIcon", $"\"{exe}\",0");
+            }
+            using (var icon = prog.CreateSubKey("DefaultIcon")) icon.SetValue("", $"\"{exe}\",0");
+            using var open = prog.CreateSubKey(@"shell\open");
+            open.SetValue("FriendlyAppName", "Mandarina");
+            open.SetValue("MultiSelectModel", "Player");
+            using var cmd = open.CreateSubKey("command");
+            cmd.SetValue("", $"\"{exe}\" --open \"%1\"");
+        }
+        // Also as an "application" so the Open With dialog shows a proper name and icon.
+        using (var appKey = Registry.CurrentUser.CreateSubKey($@"{ClassesKey}\Applications\Mandarina.exe"))
+        {
+            appKey.SetValue("FriendlyAppName", "Mandarina");
+            using var cmd = appKey.CreateSubKey(@"shell\open\command");
+            cmd.SetValue("", $"\"{exe}\" --open \"%1\"");
+            using var types = appKey.CreateSubKey("SupportedTypes");
+            foreach (var ext in FileKinds.All.Distinct()) types.SetValue(ext, "");
+        }
+        foreach (var ext in FileKinds.All.Distinct())
+        {
+            using var list = Registry.CurrentUser.CreateSubKey($@"{ClassesKey}\{ext}\OpenWithProgids");
+            list.SetValue(ProgId, Array.Empty<byte>(), RegistryValueKind.None);
+        }
+    }
+
+    private static void UnregisterOpenWith()
+    {
+        Registry.CurrentUser.DeleteSubKeyTree($@"{ClassesKey}\{ProgId}", throwOnMissingSubKey: false);
+        Registry.CurrentUser.DeleteSubKeyTree($@"{ClassesKey}\Applications\Mandarina.exe", throwOnMissingSubKey: false);
+        foreach (var ext in FileKinds.All.Distinct())
+        {
+            using var list = Registry.CurrentUser.OpenSubKey($@"{ClassesKey}\{ext}\OpenWithProgids", writable: true);
+            list?.DeleteValue(ProgId, throwOnMissingValue: false);
+        }
+    }
+
+    [System.Runtime.InteropServices.DllImport("shell32.dll")]
+    private static extern void SHChangeNotify(int eventId, uint flags, IntPtr item1, IntPtr item2);
+
+    /// <summary>Tells Explorer to reread file associations so the menus update without a restart.</summary>
+    private static void NotifyAssociationsChanged() => SHChangeNotify(0x08000000 /* SHCNE_ASSOCCHANGED */, 0, IntPtr.Zero, IntPtr.Zero);
 
     public static void Uninstall()
     {
         StopRunningInstance();
         Registry.CurrentUser.DeleteSubKeyTree(MenuKey, throwOnMissingSubKey: false);
+        UnregisterOpenWith();
+        NotifyAssociationsChanged();
         using (var run = Registry.CurrentUser.CreateSubKey(RunKey))
             run.DeleteValue("Mandarina", throwOnMissingValue: false);
         try { File.Delete(Shortcut); } catch { }

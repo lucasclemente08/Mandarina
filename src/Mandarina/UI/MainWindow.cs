@@ -136,7 +136,7 @@ internal sealed class MainWindow : Window
         // Footer with the shortcuts
         var footer = new TextBlock
         {
-            Text = "Más rápido: arrastrá un archivo y tocá Mayús  ·  Ctrl+Mayús+M  ·  clic derecho → Convertir con Mandarina",
+            Text = "Más rápido: arrastrá un archivo y tocá Mayús  ·  Ctrl+Mayús+M  ·  clic derecho → Abrir con → Mandarina",
             FontSize = 12,
             Foreground = Muted,
             TextWrapping = TextWrapping.Wrap,

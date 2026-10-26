@@ -62,7 +62,7 @@ internal sealed class Tray : IDisposable
 
     public void ShowHelp() => Balloon("Cómo se usa",
         "• Arrastrá un archivo y tocá Mayús (convertir) o Alt (editar); soltalo sobre una opción.\n" +
-        "• O seleccioná archivos y apretá Ctrl+Mayús+M, o clic derecho → Convertir con Mandarina; elegí con un clic.\n" +
+        "• O seleccioná archivos y apretá Ctrl+Mayús+M, o clic derecho → Abrir con → Mandarina; elegí con un clic.\n" +
         "Esc cancela.", Forms.ToolTipIcon.Info);
 
     public void Started(string what)

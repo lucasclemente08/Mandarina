@@ -23,8 +23,9 @@ internal static class InstancePipe
             foreach (var p in paths) w.WriteLine(p);
             return true;
         }
-        catch (Exception e) when (e is TimeoutException or IOException)
+        catch (Exception e) when (e is TimeoutException or IOException or UnauthorizedAccessException)
         {
+            Log.Write($"pipe send '{command}' failed: {e.GetType().Name}: {e.Message}");
             return false;
         }
     }

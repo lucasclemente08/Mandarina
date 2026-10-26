@@ -11,7 +11,8 @@ el resultado queda al lado del original. Inspirado en Tangerine (macOS). Todo co
 Doble clic en `Mandarina.exe` y respondé **Sí**. Se instala solo para tu usuario, sin permisos de administrador, en
 `%LOCALAPPDATA%\Programs\Mandarina`. Además:
 
-- agrega **"Convertir con Mandarina"** al clic derecho del Explorador,
+- la agrega al clic derecho del Explorador: **Abrir con → Mandarina** (en Windows 11 aparece en el menú corto)
+  y **Convertir con Mandarina** (en *Mostrar más opciones*). No cambia el programa que abre cada archivo por defecto,
 - la arranca sola con Windows,
 - crea un acceso en el menú Inicio.
 
@@ -29,7 +30,7 @@ Para ir más rápido, hay tres atajos que abren la rueda:
 |---|---|---|
 | **Arrastrar** | Empezá a arrastrar archivos y tocá **Mayús** (convertir) o **Alt** (editar) | soltando sobre la opción |
 | **Atajo** | Seleccioná archivos en el Explorador o el escritorio y apretá **Ctrl+Mayús+M** | un clic |
-| **Clic derecho** | Clic derecho → **Convertir con Mandarina** (en Windows 11 aparece en *Mostrar más opciones*) | un clic |
+| **Clic derecho** | Clic derecho → **Abrir con → Mandarina** | un clic |
 
 En modo clic, hacer clic en el **centro** de la rueda alterna entre convertir y editar. **Esc**, o un clic
 fuera de la rueda, la cierra.
@@ -95,8 +96,9 @@ dotnet publish src/Mandarina -c Release -r win-x64 --self-contained false -p:Pub
 
 - No ve arrastres desde aplicaciones que corren como administrador (restricción de Windows/UIPI).
 - "Unir" video necesita clips con la misma resolución y con pista de audio.
-- En Windows 11 la entrada del clic derecho aparece en "Mostrar más opciones" (Mayús+F10). Windows solo pone
-  en el menú corto a las apps empaquetadas y firmadas (MSIX). Alternativa: en el menú del ícono, activá
+- En Windows 11 la entrada "Convertir con Mandarina" aparece en "Mostrar más opciones" (Mayús+F10), porque Windows
+  solo pone en el menú corto a las apps empaquetadas y firmadas (MSIX). Por eso Mandarina también se registra
+  en **Abrir con**, que sí está en el menú corto. Otra alternativa: en el menú del ícono, activá
   **"Mandarina directo en el clic derecho"**, que vuelve al menú completo de Windows 10 en todo el sistema
   (reversible desde el mismo lugar).
 - PDF → Word no está incluido: Word se cuelga al hacerlo por automatización.
