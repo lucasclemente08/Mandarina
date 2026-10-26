@@ -20,7 +20,6 @@ internal sealed class Tray : IDisposable
     public event Action? ExitRequested;
     public event Action? UninstallRequested;
     public event Action? ShowRequested;
-    public event Action<bool>? ClassicMenuRequested;
 
     public Tray()
     {
@@ -37,13 +36,6 @@ internal sealed class Tray : IDisposable
         menu.Items.Add(new Forms.ToolStripSeparator());
         menu.Items.Add(_enabledItem);
         menu.Items.Add(_startupItem);
-        if (Mandarina.Interop.ClassicMenu.IsWindows11)
-        {
-            var classic = new Forms.ToolStripMenuItem("Mandarina directo en el clic derecho") { Checked = Mandarina.Interop.ClassicMenu.IsEnabled };
-            classic.Click += (_, _) => ClassicMenuRequested?.Invoke(!classic.Checked);
-            menu.Opening += (_, _) => classic.Checked = Mandarina.Interop.ClassicMenu.IsEnabled;
-            menu.Items.Add(classic);
-        }
         menu.Items.Add("Cómo se usa", null, (_, _) => ShowHelp());
         menu.Items.Add("Desinstalar…", null, (_, _) => UninstallRequested?.Invoke());
         menu.Items.Add(new Forms.ToolStripSeparator());

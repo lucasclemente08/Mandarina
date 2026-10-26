@@ -56,7 +56,6 @@ internal sealed class DragWatcher : IDisposable
             switch ((int)wParam)
             {
                 case Native.WM_LBUTTONDOWN:
-                    Log.Write("ldown");
                     _leftDown = true;
                     _dragging = false;
                     _downPt = data.pt;
@@ -69,7 +68,7 @@ internal sealed class DragWatcher : IDisposable
                     {
                         int dx = Math.Abs(data.pt.X - _downPt.X), dy = Math.Abs(data.pt.Y - _downPt.Y);
                         if (dx > Native.GetSystemMetrics(Native.SM_CXDRAG) || dy > Native.GetSystemMetrics(Native.SM_CYDRAG))
-                            { _dragging = true; Log.Write("dragging"); }
+                            _dragging = true;
                     }
                     break;
                 case Native.WM_LBUTTONUP:

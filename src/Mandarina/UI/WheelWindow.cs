@@ -110,6 +110,7 @@ internal sealed class WheelWindow : Window
     public void ShowFor(IReadOnlyList<string> files, Native.POINT pt, WheelMode mode)
     {
         _enterTimeout.Stop();
+        Log.Write($"ShowFor {files.Count} files at {pt.X},{pt.Y} mode={mode}");
         IsClickMode = true;
         _mode = mode;
         _files = files;
@@ -143,6 +144,7 @@ internal sealed class WheelWindow : Window
         if (!IsClickMode) return;
         e.Handled = true;
         var p = e.GetPosition(_canvas);
+        Log.Write($"wheel click at {p.X:0},{p.Y:0} hit={HitTest(p)} actions={_actions.Count}");
         double dx = p.X - C, dy = p.Y - C;
         if (dx * dx + dy * dy < CenterRadius * CenterRadius)
         {

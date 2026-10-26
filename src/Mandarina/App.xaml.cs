@@ -14,6 +14,7 @@ public partial class App : Application
     private Tray? _tray;
     private Hotkey? _hotkey;
     private MainWindow? _main;
+    private ToastWindow? _toast;
     private readonly List<string> _pendingOpen = [];
     private System.Windows.Threading.DispatcherTimer? _openDebounce;
 
@@ -21,6 +22,8 @@ public partial class App : Application
     {
         base.OnStartup(e);
         var args = e.Args;
+        DispatcherUnhandledException += (_, ex) => Log.Write($"UI error: {ex.Exception}");
+        AppDomain.CurrentDomain.UnhandledException += (_, ex) => Log.Write($"fatal: {ex.ExceptionObject}");
         // The UI is simple; software rendering avoids GPU-driver crashes (seen in atidxx64.dll) in a tray app that runs all day.
         System.Windows.Media.RenderOptions.ProcessRenderMode = System.Windows.Interop.RenderMode.SoftwareOnly;
         Log.Write($"start pid={Environment.ProcessId} args=[{string.Join(" | ", args)}] cwd={Environment.CurrentDirectory}");
@@ -73,7 +76,6 @@ public partial class App : Application
         _tray = new Tray();
         _tray.ExitRequested += () => Shutdown();
         _tray.ShowRequested += ShowMain;
-        _tray.ClassicMenuRequested += SetClassicMenu;
         _tray.UninstallRequested += () =>
         {
             if (MessageBox.Show("¿Desinstalar Mandarina? Se quita del menú contextual, del inicio y del menú Inicio.",
@@ -99,7 +101,11 @@ public partial class App : Application
         _watcher.MousePressed += pt =>
         {
             // Click mode: clicking anywhere outside the wheel closes it.
-            if (_wheel.IsOpen && _wheel.IsClickMode && !_wheel.Contains(pt)) _wheel.HideWheel();
+            if (_wheel.IsOpen && _wheel.IsClickMode && !_wheel.Contains(pt))
+            {
+                Log.Write($"click outside wheel at {pt.X},{pt.Y}: closing");
+                _wheel.HideWheel();
+            }
         };
         _watcher.Escape += () => { if (_wheel.IsOpen) _wheel.HideWheel(); };
         _tray.EnabledChanged += on => _watcher.Enabled = on;
@@ -190,18 +196,6 @@ public partial class App : Application
         _main.ShowAndActivate();
     }
 
-    private void SetClassicMenu(bool on)
-    {
-        var question = on
-            ? "Esto vuelve al menú de clic derecho completo de Windows (el de Windows 10) en todo el sistema, " +
-              "así \"Convertir con Mandarina\" aparece directo sin \"Mostrar más opciones\".\n\n" +
-              "Para aplicarlo hay que reiniciar el Explorador: se cierran las ventanas de carpetas abiertas.\n\n¿Continuar?"
-            : "Vuelve al menú corto de Windows 11. Hay que reiniciar el Explorador (se cierran las ventanas de carpetas).\n\n¿Continuar?";
-        if (MessageBox.Show(question, "Mandarina", MessageBoxButton.YesNo, MessageBoxImage.Question) != MessageBoxResult.Yes) return;
-        ClassicMenu.Set(on);
-        ClassicMenu.RestartExplorer();
-    }
-
     /// <summary>Runs an action, reporting progress in the tray; rethrows so the window can show errors too.</summary>
     private async Task<IReadOnlyList<string>> RunAction(FileAction action, IReadOnlyList<string> files)
     {
@@ -209,15 +203,21 @@ public partial class App : Application
         // The window shows its own status; only use balloons when it is not in front.
         bool quiet = _main is { IsActive: true };
         _tray!.Started(what);
+        if (!quiet) (_toast ??= new ToastWindow()).Working(what);
+        Log.Write($"run {action.Id} on [{string.Join(" | ", files)}]");
         try
         {
             var outputs = await Task.Run(() => action.Run(files, CancellationToken.None));
-            _tray.Finished(outputs, balloon: !quiet);
+            Log.Write($"done {action.Id} -> [{string.Join(" | ", outputs)}]");
+            _tray.Finished(outputs, balloon: false);
+            if (!quiet) _toast!.Done(outputs); else _toast?.Hide();
             return outputs;
         }
         catch (Exception ex)
         {
-            _tray.Failed(ex.Message, balloon: !quiet);
+            Log.Write($"failed {action.Id}: {ex}");
+            _tray.Failed(ex.Message, balloon: false);
+            if (!quiet) _toast!.Failed(ex.Message); else _toast?.Hide();
             throw;
         }
     }

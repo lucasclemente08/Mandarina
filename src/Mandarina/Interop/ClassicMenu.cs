@@ -4,9 +4,8 @@ using Microsoft.Win32;
 namespace Mandarina.Interop;
 
 /// <summary>
-/// Windows 11 only shows packaged (MSIX) apps in its short right-click menu. The documented per-user
-/// switch back to the full classic menu makes "Convertir con Mandarina" appear directly, without
-/// "Mostrar más opciones". It affects every right-click menu, so it is opt-in and reversible.
+/// Earlier versions offered the per-user switch back to the classic right-click menu. Windows 11 25H2
+/// ignores it, so the option is gone; this only remains so uninstall can remove what those versions set.
 /// </summary>
 internal static class ClassicMenu
 {

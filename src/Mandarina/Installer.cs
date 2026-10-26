@@ -85,8 +85,44 @@ internal static class Installer
         }
         foreach (var ext in FileKinds.All.Distinct())
         {
-            using var list = Registry.CurrentUser.CreateSubKey($@"{ClassesKey}\{ext}\OpenWithProgids");
-            list.SetValue(ProgId, Array.Empty<byte>(), RegistryValueKind.None);
+            using (var list = Registry.CurrentUser.CreateSubKey($@"{ClassesKey}\{ext}\OpenWithProgids"))
+                list.SetValue(ProgId, "");
+            AddToOpenWithHistory(ext);
+        }
+    }
+
+    private const string FileExtsKey = @"Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts";
+
+    /// <summary>
+    /// Windows 11's "Abrir con" submenu only lists apps from the type's recently-used list, so a
+    /// newly registered app stays hidden until picked once through "Elegir otra aplicación".
+    /// Putting Mandarina.exe at the front of that list (Explorer's own MRU, not the default-app
+    /// choice) makes it show up right away.
+    /// </summary>
+    private static void AddToOpenWithHistory(string ext)
+    {
+        using var key = Registry.CurrentUser.CreateSubKey($@"{FileExtsKey}\{ext}\OpenWithList");
+        var names = key.GetValueNames().Where(n => n.Length == 1 && char.IsLower(n[0])).ToList();
+        var slot = names.FirstOrDefault(n => string.Equals(key.GetValue(n) as string, "Mandarina.exe", StringComparison.OrdinalIgnoreCase));
+        if (slot is null)
+        {
+            var free = Enumerable.Range('a', 26).Select(c => ((char)c).ToString()).FirstOrDefault(c => !names.Contains(c));
+            if (free is null) return; // list full: leave Explorer's history alone
+            slot = free;
+            key.SetValue(slot, "Mandarina.exe");
+        }
+        var mru = (key.GetValue("MRUList") as string ?? "").Replace(slot, "");
+        key.SetValue("MRUList", slot + mru);
+    }
+
+    private static void RemoveFromOpenWithHistory(string ext)
+    {
+        using var key = Registry.CurrentUser.OpenSubKey($@"{FileExtsKey}\{ext}\OpenWithList", writable: true);
+        if (key is null) return;
+        foreach (var n in key.GetValueNames().Where(n => n.Length == 1 && string.Equals(key.GetValue(n) as string, "Mandarina.exe", StringComparison.OrdinalIgnoreCase)))
+        {
+            key.DeleteValue(n);
+            if (key.GetValue("MRUList") is string mru) key.SetValue("MRUList", mru.Replace(n, ""));
         }
     }
 
@@ -98,6 +134,7 @@ internal static class Installer
         {
             using var list = Registry.CurrentUser.OpenSubKey($@"{ClassesKey}\{ext}\OpenWithProgids", writable: true);
             list?.DeleteValue(ProgId, throwOnMissingValue: false);
+            RemoveFromOpenWithHistory(ext);
         }
     }
 

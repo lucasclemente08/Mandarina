@@ -98,7 +98,7 @@ dotnet publish src/Mandarina -c Release -r win-x64 --self-contained false -p:Pub
 - "Unir" video necesita clips con la misma resolución y con pista de audio.
 - En Windows 11 la entrada "Convertir con Mandarina" aparece en "Mostrar más opciones" (Mayús+F10), porque Windows
   solo pone en el menú corto a las apps empaquetadas y firmadas (MSIX). Por eso Mandarina también se registra
-  en **Abrir con**, que sí está en el menú corto. Otra alternativa: en el menú del ícono, activá
-  **"Mandarina directo en el clic derecho"**, que vuelve al menú completo de Windows 10 en todo el sistema
-  (reversible desde el mismo lugar).
+  en **Abrir con**, que sí está en el menú corto (y la pone primera en la lista de usadas de cada tipo, porque
+  ese submenú solo muestra apps que ya se usaron). El truco del registro para volver al menú clásico ya no
+  funciona en Windows 11 25H2, así que Mandarina no lo usa.
 - PDF → Word no está incluido: Word se cuelga al hacerlo por automatización.
